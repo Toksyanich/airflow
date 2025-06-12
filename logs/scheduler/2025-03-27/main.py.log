@@ -1,0 +1,7 @@
+[2025-03-27T09:49:17.464+0000] {processor.py:186} INFO - Started process (PID=74) to work on /opt/airflow/dags/main.py
+[2025-03-27T09:49:17.465+0000] {processor.py:914} INFO - Processing file /opt/airflow/dags/main.py for tasks to queue
+[2025-03-27T09:49:17.468+0000] {logging_mixin.py:190} INFO - [2025-03-27T09:49:17.467+0000] {dagbag.py:588} INFO - Filling up the DagBag from /opt/airflow/dags/main.py
+[2025-03-27T09:49:17.484+0000] {processor.py:925} INFO - DAG(s) 'data_process' retrieved from /opt/airflow/dags/main.py
+[2025-03-27T09:49:17.513+0000] {logging_mixin.py:190} INFO - [2025-03-27T09:49:17.513+0000] {dag.py:3239} INFO - Sync 1 DAGs
+[2025-03-27T09:49:17.528+0000] {logging_mixin.py:190} INFO - [2025-03-27T09:49:17.528+0000] {dag.py:4180} INFO - Setting next_dagrun for data_process to None, run_after=None
+[2025-03-27T09:49:17.544+0000] {processor.py:208} INFO - Processing /opt/airflow/dags/main.py took 0.086 seconds
