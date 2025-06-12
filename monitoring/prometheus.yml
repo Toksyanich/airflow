@@ -7,13 +7,13 @@ scrape_configs:
     static_configs:
       - targets: ['cadvisor:8080']
 
-  - job_name: 'airflow'
-    metrics_path: /metrics
-    basic_auth:
-      username: airflow
-      password: airflow
-    static_configs:
-      - targets:
-        - 'airflow-scheduler:8793'
-        - 'airflow-triggerer:8794'
+  #- job_name: 'airflow'
+    #metrics_path: /metrics
+   # basic_auth:
+     # username: airflow
+      #password: airflow
+    #static_configs:
+      #- targets:
+        #- 'airflow-scheduler:8793'
+        #- 'airflow-triggerer:8794'
         #- 'airflow-webserver:8080'

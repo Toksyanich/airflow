@@ -27,16 +27,16 @@ x-airflow-common: &airflow-common
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
+    #AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: airflow-clickhouse-plugin
     #AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
-    AIRFLOW__METRICS__STATSD_ON: 'False'
-    AIRFLOW__METRICS__PROMETHEUS_ON: 'True'
-    AIRFLOW__METRICS__METRICS_HEALTH_ENDPOINT: 'True'
-    AIRFLOW__METRICS__PROMETHEUS_AUTH: 'False'
+    #AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    #AIRFLOW__METRICS__STATSD_ON: 'False'
+    #AIRFLOW__METRICS__PROMETHEUS_ON: 'True'
+    #AIRFLOW__METRICS__METRICS_HEALTH_ENDPOINT: 'True'
+    #AIRFLOW__METRICS__PROMETHEUS_AUTH: 'False'
     # Подключения к дополнительным базам данных
     AIRFLOW_CONN_POSTGRES_DATA: postgresql://admin:admin@postgres_data:5432/mydb
     AIRFLOW_CONN_CLICKHOUSE_DATA: clickhouse://admin:admin@clickhouse_data:9000/mydb
@@ -88,6 +88,7 @@ services:
       start_period: 20s
     volumes:
       - postgres_data_volume:/var/lib/postgresql/data
+      - ./scripts/postgres_init:/docker-entrypoint-initdb.d
     networks:
       - db_network
     restart: unless-stopped
@@ -100,6 +101,7 @@ services:
       - "9001:9000"
     volumes:
       - clickhouse_data_volume:/var/lib/clickhouse
+      - ./scripts/clickhouse_init:/docker-entrypoint-initdb.d
     environment:
       CLICKHOUSE_DB: mydb
       CLICKHOUSE_USER: admin
