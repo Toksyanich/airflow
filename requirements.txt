@@ -1,0 +1,6 @@
+apache-airflow==2.8.3
+pandas==1.5.3
+SQLAlchemy==1.4.51
+psycopg2-binary==2.9.9
+clickhouse-driver==0.2.6
+airflow-clickhouse-plugin==0.2.4

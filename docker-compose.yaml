@@ -19,7 +19,7 @@
 # extended with additional PostgreSQL and ClickHouse services.
 
 x-airflow-common: &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.5}
+  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.8.3-python3.10-slim}
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -30,7 +30,7 @@ x-airflow-common: &airflow-common
     #AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    _PIP_ADDITIONAL_REQUIREMENTS: airflow-clickhouse-plugin
+    _PIP_ADDITIONAL_REQUIREMENTS: "airflow-clickhouse-plugin==0.2.4 pandas==1.5.3 SQLAlchemy==1.4.51 psycopg2-binary==2.9.9 clickhouse-driver==0.2.6"
     #AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
     #AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     #AIRFLOW__METRICS__STATSD_ON: 'False'
@@ -56,7 +56,7 @@ x-airflow-common: &airflow-common
 
 services:
   postgres:
-    image: postgres:13
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -73,7 +73,7 @@ services:
       - db_network
 
   postgres_data:
-    image: postgres:latest
+    image: postgres:16-alpine
     container_name: postgres_db_1
     environment:
       POSTGRES_USER: admin
@@ -94,7 +94,7 @@ services:
     restart: unless-stopped
 
   clickhouse_data:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:23.8.12.34-alpine
     container_name: clickhouse_db_1
     ports:
       - "8124:8123"
@@ -118,7 +118,7 @@ services:
     restart: unless-stopped
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: cadvisor
     privileged: true
     ports:
@@ -133,7 +133,7 @@ services:
       - db_network
 
   prometheus:
-    image: bitnami/prometheus:latest
+    image: bitnami/prometheus:2.48.0
     container_name: prometheus
     ports:
       - "9090:9090"
@@ -144,7 +144,7 @@ services:
     networks:
       - db_network
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.2
     container_name: grafana
     ports:
       - "3000:3000"
@@ -158,7 +158,7 @@ services:
       - db_network
 
   redis:
-    image: redis:7.2-bookworm
+    image: redis:7.2-alpine
     expose:
       - 6379
     healthcheck:

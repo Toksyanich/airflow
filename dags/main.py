@@ -5,6 +5,10 @@ from datetime import datetime
 from sqlalchemy import create_engine
 import pandas as pd
 from airflow.exceptions import AirflowException
+import logging
+
+# Configure module-level logger (Airflow handles root configuration)
+logger = logging.getLogger(__name__)
 
 # Импорт Hook из airflow-clickhouse-plugin
 from clickhouse_driver import Client
@@ -20,9 +24,9 @@ def postgres_connection():
         with engine.connect() as connection:
             result = connection.execute("SELECT version();")
             db_version = result.fetchone()
-            print(f"Успешное подключение Postgres! Версия: {db_version[0]}")
+            logger.info(f"Успешное подключение Postgres! Версия: {db_version[0]}")
     except Exception as e:
-        print(f"Ошибка подключения к Postgres: {e}")
+        logger.exception("Ошибка подключения к Postgres")
         raise
 
 
@@ -87,9 +91,9 @@ def data_loading_staging():
                 method='multi',
                 chunksize=10_000,
             )
-        print('Данные успешно загружены в staging.students (Postgres)!')
+        logger.info('Данные успешно загружены в staging.students (Postgres)!')
     except Exception as e:
-        print(f"Ошибка загрузки данных в Postgres: {e}")
+        logger.exception("Ошибка загрузки данных в Postgres")
         raise AirflowException(f"Ошибка загрузки данных: {e}")
 
 
@@ -119,9 +123,9 @@ def postgres_to_clickhouse():
                 'INSERT INTO staging.students VALUES',
                 df_chunk
             )
-        print('Данные успешно загружены в ClickHouse!')
+        logger.info('Данные успешно загружены в ClickHouse!')
     except Exception as e:
-        print(f"Ошибка загрузки данных в ClickHouse: {e}")
+        logger.exception("Ошибка загрузки данных в ClickHouse")
         raise AirflowException(f"Ошибка загрузки данных в ClickHouse: {e}")
 
 # Параметры DAG
