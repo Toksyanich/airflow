@@ -1,5 +1,8 @@
 import psycopg2
 from psycopg2 import sql
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def test_postgres_connection():
@@ -17,10 +20,13 @@ def test_postgres_connection():
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1;")
             db_version = cursor.fetchone()
-            print(f"Успешное подключение! Версия PostgreSQL: {db_version[0]}")
+            if db_version:
+                logger.info(f"Успешное подключение! Версия PostgreSQL: {db_version[0]}")
+            else:
+                logger.warning("Не удалось получить версию PostgreSQL")
 
     except Exception as e:
-        print(f"Ошибка подключения: {str(e)}")
+        logger.exception("Ошибка подключения")
         raise
 
     finally:

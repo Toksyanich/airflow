@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Unit test / coverage reports
+coverage.xml
+*.cover
+
+# Airflow logs and dags outputs
+logs/
+
+# Virtual environments
+.env
+.venv
+
+# Git
+.git
+
+# Datasets
+*.csv

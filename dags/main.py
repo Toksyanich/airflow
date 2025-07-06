@@ -5,6 +5,10 @@ from datetime import datetime
 from sqlalchemy import create_engine
 import pandas as pd
 from airflow.exceptions import AirflowException
+import logging
+
+# Configure module-level logger (Airflow handles root configuration)
+logger = logging.getLogger(__name__)
 
 # Импорт Hook из airflow-clickhouse-plugin
 from clickhouse_driver import Client
@@ -20,30 +24,18 @@ def postgres_connection():
         with engine.connect() as connection:
             result = connection.execute("SELECT version();")
             db_version = result.fetchone()
-            print(f"Успешное подключение Postgres! Версия: {db_version[0]}")
+            logger.info(f"Успешное подключение Postgres! Версия: {db_version[0]}")
     except Exception as e:
-        print(f"Ошибка подключения к Postgres: {e}")
+        logger.exception("Ошибка подключения к Postgres")
         raise
 
 
 def data_loading_staging():
     try:
         csv_path = '/opt/airflow/dags/Students.csv'
-        df = pd.read_csv(
-            csv_path,
-            sep=',',
-            quotechar='"',
-            engine='python',
-            on_bad_lines='warn',
-            usecols=[
-                'Student_ID', 'Age', 'Gender', 'Academic_Level', 'Country',
-                'Avg_Daily_Usage_Hours', 'Most_Used_Platform',
-                'Affects_Academic_Performance', 'Sleep_Hours_Per_Night',
-                'Mental_Health_Score', 'Relationship_Status',
-                'Conflicts_Over_Social_Media', 'Addicted_Score'
-            ]
-        )
-        df = df.rename(columns={
+
+        # Define schema mapping once to avoid repetitive work per chunk
+        column_rename_map = {
             'Student_ID': 'student_id',
             'Age': 'age',
             'Gender': 'gender',
@@ -57,60 +49,83 @@ def data_loading_staging():
             'Relationship_Status': 'relationship_status',
             'Conflicts_Over_Social_Media': 'conflicts_over_social_media',
             'Addicted_Score': 'addicted_score'
-        })
-        df = df.astype({
-            'student_id': 'int',
-            'age': 'int',
-            'avg_daily_usage_hours': 'float',
-            'sleep_hours_per_night': 'float',
-            'mental_health_score': 'int',
-            'conflicts_over_social_media': 'int',
-            'addicted_score': 'int'
-        })
-        df['affects_academic_performance'] = df['affects_academic_performance'].map({'Yes': True, 'No': False})
+        }
+        # Explicit dtypes for faster parsing & lower memory
+        dtypes = {
+            'Student_ID': 'int32',
+            'Age': 'int8',
+            'Avg_Daily_Usage_Hours': 'float32',
+            'Sleep_Hours_Per_Night': 'float32',
+            'Mental_Health_Score': 'int16',
+            'Conflicts_Over_Social_Media': 'int8',
+            'Addicted_Score': 'int16'
+        }
 
-        engine = create_engine("postgresql+psycopg2://admin:admin@postgres_data:5432/mydb")
-        df.to_sql('students', engine, schema='staging', if_exists='append', index=False)
-        print('Данные успешно загружены в staging.students (Postgres)!')
+        engine = create_engine(
+            "postgresql+psycopg2://admin:admin@postgres_data:5432/mydb",
+            pool_pre_ping=True
+        )
+
+        # Stream the CSV in manageable chunks instead of loading it all at once
+        for chunk in pd.read_csv(
+            csv_path,
+            sep=',',
+            quotechar='"',
+            engine='python',  # faster C-engine ‑ falls back automatically on bad lines
+            on_bad_lines='warn',
+            usecols=list(column_rename_map.keys()),
+            dtype=dtypes,
+            chunksize=50_000  # tune based on available memory / file size
+        ):
+            chunk = chunk.rename(columns=column_rename_map, copy=False)
+            # Convert Yes/No → boolean without allocating a new column twice
+            chunk['affects_academic_performance'] = chunk['affects_academic_performance'].eq('Yes')
+
+            # Write in batches – method='multi' groups inserts into single statement
+            chunk.to_sql(
+                'students',
+                engine,
+                schema='staging',
+                if_exists='append',
+                index=False,
+                method='multi',
+                chunksize=10_000,
+            )
+        logger.info('Данные успешно загружены в staging.students (Postgres)!')
     except Exception as e:
-        print(f"Ошибка загрузки данных в Postgres: {e}")
+        logger.exception("Ошибка загрузки данных в Postgres")
         raise AirflowException(f"Ошибка загрузки данных: {e}")
 
 
 def postgres_to_clickhouse():
     try:
-        # Считываем данные из Postgres
-        pg_engine = create_engine("postgresql+psycopg2://admin:admin@postgres_data:5432/mydb")
-        df = pd.read_sql_table('students', pg_engine, schema='staging')
+        pg_engine = create_engine(
+            "postgresql+psycopg2://admin:admin@postgres_data:5432/mydb",
+            pool_pre_ping=True,
+        )
 
-        # Вставляем данные в ClickHouse напрямую через clickhouse_driver
         client = Client(
-            host='clickhouse_db_1',  # контейнерное имя сервиса из docker-compose
-            port=9000,                # нативный TCP-порт внутри сети db_network
+            host='clickhouse_db_1',
+            port=9000,
             user='admin',
             password='admin',
-            database='staging'
+            database='staging',
+            compression='lz4'
         )
-        # Формируем список кортежей для вставки
-        records = [tuple(r) for r in df.itertuples(index=False, name=None)]
-        insert_sql = (
-            "INSERT INTO staging.students ("
-            "student_id, age, gender, academic_level, country,"
-            "avg_daily_usage_hours, most_used_platform,"
-            "affects_academic_performance, sleep_hours_per_night,"
-            "mental_health_score, relationship_status,"
-            "conflicts_over_social_media, addicted_score) VALUES"
-        )
-        client.execute(
-            insert_sql,
-            records,
-            settings={
-                'max_partitions_per_insert_block': 1000
-            }
-        )
-        print('Данные успешно загружены в ClickHouse!')
+
+        # Stream data from Postgres and push to ClickHouse in batches to avoid OOM
+        for df_chunk in pd.read_sql_query(
+            'SELECT * FROM staging.students',
+            pg_engine,
+            chunksize=100_000,
+        ):
+            client.insert_dataframe(
+                'INSERT INTO staging.students VALUES',
+                df_chunk
+            )
+        logger.info('Данные успешно загружены в ClickHouse!')
     except Exception as e:
-        print(f"Ошибка загрузки данных в ClickHouse: {e}")
+        logger.exception("Ошибка загрузки данных в ClickHouse")
         raise AirflowException(f"Ошибка загрузки данных в ClickHouse: {e}")
 
 # Параметры DAG
